@@ -1017,5 +1017,28 @@ end
 
 
 
-// https://www.wavemetrics.com/code-snippet/stacked-plots-multiple-plots-graph
+function centering(wave waved,string new_name, wave mids)
+	string w2d=nameofwave(waved)
+	int wavenum=getfirstnum(w2d)	
+	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+	
+	duplicate/o waved new2dwave
+	wave new2dwave=$new_name
+	copyscales waved new2dwave
+	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+	new2dwave=interp2d(waved,(x+mids[q]),(y)) // column 3 is the center fit parameter
 
+end
+function cst_centering(wave waved,string kenner_out)
+	string w2d=nameofwave(waved)
+	int wavenum=getfirstnum(w2d)
+	string centered=kenner_out+num2str(wavenum)+"centered"
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
+	wave fit_params = $fit_params_name
+	
+	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+	duplicate/o waved $centered
+	wave new2dwave=$centered
+	copyscales waved new2dwave
+	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+end

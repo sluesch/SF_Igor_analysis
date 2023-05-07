@@ -24,6 +24,9 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
 	string centered=kenner_out+num2str(wavenum)+"centered"
 	string cleaned=kenner_out+num2str(wavenum)+"cleaned"
 	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
+	wave fit_params = $fit_params_name
+	
+
 
 
 	variable N=3; // how many sdevs are acceptable?
@@ -47,13 +50,17 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
 	find_plot_thetas(wavenum,N,fit_params_name)
 
 	if (dotcondcentering==0)
+	
 		//find_plot_thetas(wavenum,N,kenner_out)
-		cst_centering($datasetname,kenner_out) // centred plot and average plot
+		duplicate/o/r=[][3] fit_params mids
+		centering($datasetname,centered,mids) // centred plot and average plot
 		cleaning($centered,badthetasx)
 
 	elseif(dotcondcentering==1)
-		dotcond_centering($datasetname,kenner_out)
-		cleaning($centered,badgammasx)
+//			duplicate/o/r=[][3] fit_params mids
+//
+//		centering($datasetname,centered,mids)
+//		cleaning($centered,badgammasx)
 
 	endif
 	
@@ -309,34 +316,6 @@ if (nr>0)
 endif
 end
 
-
-function cst_centering(wave waved,string kenner_out)
-	string w2d=nameofwave(waved)
-	int wavenum=getfirstnum(w2d)
-	string centered=kenner_out+num2str(wavenum)+"centered"
-	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
-	wave fit_params = $fit_params_name
-	
-	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
-	duplicate/o waved $centered
-	wave new2dwave=$centered
-	copyscales waved new2dwave
-	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-end
-
-function centering(wave waved,string new_name, wave mids)
-	string w2d=nameofwave(waved)
-	int wavenum=getfirstnum(w2d)
-	string centered="demod"+num2str(wavenum)+"centered"
-	string fit_params_name = getprefix(w2d)+num2str(wavenum)+"fit_params"
-	wave fit_params = $fit_params_name
-	
-	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
-	duplicate/o waved $centered
-	wave new2dwave=$centered
-	copyscales waved new2dwave
-	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-end
 
 
 function /wave cleaning(wave center, wave badthetasx)
