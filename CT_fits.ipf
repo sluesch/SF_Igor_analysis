@@ -3,7 +3,7 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
+function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,[string condfit_prefix])
 	// wav is the wave containing original CT data
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
@@ -56,7 +56,7 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
 		cleaning($centered,badthetasx)
 
 	elseif(dotcondcentering==1)
-		string condfit_params_name = "cond"+num2str(wavenum)+"fit_params"
+		string condfit_params_name=condfit_prefix+num2str(wavenum)+"fit_params"
 		wave condfit_params = $condfit_params_name
 
 		duplicate/o/r=[][2] condfit_params mids
