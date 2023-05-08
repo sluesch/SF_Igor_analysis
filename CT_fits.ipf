@@ -29,7 +29,7 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
 
 
 
-	variable N=3; // how many sdevs are acceptable?
+	variable N=1; // how many sdevs are acceptable?
 
 
 	wave W_coef
@@ -45,25 +45,27 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
 	if (refit==1)
 		get_initial_params($quickavg);// print W_coef
 		fit_transition($quickavg);// print W_coef
-		get_fit_params($datasetname,fit_params_name) // 1 is for do not look for starting params
+		get_fit_params($datasetname,fit_params_name) //
 	endif
 	find_plot_thetas(wavenum,N,fit_params_name)
 
 	if (dotcondcentering==0)
-	
-		//find_plot_thetas(wavenum,N,kenner_out)
-		duplicate/o/r=[][3] fit_params mids
+
+		duplicate/o/r=[][3] $fit_params_name mids
 		centering($datasetname,centered,mids) // centred plot and average plot
 		cleaning($centered,badthetasx)
 
 	elseif(dotcondcentering==1)
-//			duplicate/o/r=[][3] fit_params mids
-//
-//		centering($datasetname,centered,mids)
-//		cleaning($centered,badgammasx)
+		string condfit_params_name = "cond"+num2str(wavenum)+"fit_params"
+		wave condfit_params = $condfit_params_name
+
+		duplicate/o/r=[][2] condfit_params mids
+
+		centering($datasetname,centered,mids)
+		cleaning($centered,badgammasx)
 
 	endif
-	
+
 	avg_wav($cleaned) // quick average plot
 	get_initial_params($quickavg); //print W_coef
 	fit_transition($avg)
@@ -174,7 +176,6 @@ function /wave get_fit_params(wave wavenm, string fit_params_name)
 	int wavenum=getfirstnum(w2d)
 	int nc
 	int nr
-	wave fit_params
 	wave temp_wave
 	wave W_coef
 	wave W_sigma

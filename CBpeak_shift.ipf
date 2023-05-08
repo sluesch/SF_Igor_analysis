@@ -10,7 +10,7 @@ function dotcond_avg(int wavenum, int refit)
 
 	//closeallGraphs()
 
-	string datasetname ="dat"+num2str(wavenum)+"dotcurrent_2d"
+	string datasetname ="dat"+num2str(wavenum)+"dotcurrent_2d_nf"
 	string avg = "cond" + num2str(wavenum) + "avg"
 	string cond_centr="cond"+num2str(wavenum)+"centered"
 	string cleaned="cond"+num2str(wavenum)+"cleaned"
@@ -23,14 +23,13 @@ function dotcond_avg(int wavenum, int refit)
 	variable N
 	N=40// how many sdevs in thetas are acceptable?
 
-	//remove_noise($datasetname);
-	datasetname=datasetname+"_nf";
-	resampleWave($datasetname,600);
+
 
 	if (refit==1)
 		cond_fit_params($datasetname)
 		find_plot_gammas(fit_params_name,N) //need to do this to refind good and bad gammas
-		dotcentering($datasetname) // only need to center after redoing fits, centred plot; returns cond_centr
+		duplicate/o/r=[][2] $fit_params_name mids
+		centering($datasetname,cond_centr,mids)// only need to center after redoing fits, centred plot; returns cond_centr
 		dotcleaned($cond_centr) // only need to clean after redoing fits; returns cond_centr
 	endif
 
@@ -230,17 +229,17 @@ end
 
 
 
-function dotcentering(wave waved)
-	string w2d=nameofwave(waved)
-	int wavenum=getfirstnum(w2d)
-	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
-	string centered = "cond"+num2str(wavenum)+"centered"
-	wave fit_params = $fit_params_name
-
-	wave new2dwave=$centered
-	copyscales waved new2dwave
-	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
-end
+//function dotcentering(wave waved)
+//	string w2d=nameofwave(waved)
+//	int wavenum=getfirstnum(w2d)
+//	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
+//	string centered = "cond"+num2str(wavenum)+"centered"
+//	wave fit_params = $fit_params_name
+//
+//	wave new2dwave=$centered
+//	copyscales waved new2dwave
+//	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
+//end
 
 
 end
