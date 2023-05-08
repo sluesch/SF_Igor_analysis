@@ -4,6 +4,11 @@
 #include <Reduce Matrix Size>
 
 function dotcond_avg(wave wav, int refit,string kenner_out)
+// wav is the wave containing original dotcurrent data
+	// refit tells whether to do new fits to each CT line
+	// kenner_out is the prefix to replace dat for this analysis
+	// kenner_out  can not contain a number otherwise getfirstnu will not work
+
 	variable refnum, ms
 		//stopalltimers()
 	refnum=startmstimer

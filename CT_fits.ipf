@@ -8,6 +8,7 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
 	// kenner_out is the prefix to replace dat for this analysis
+	// kenner_out and condfit_prefix can not contain a number otherwise getfirstnu will not work
 
 	variable refnum, ms
 	//		stopalltimers() // run this line if timer returns nan
@@ -323,7 +324,6 @@ function /wave cleaning(wave center, wave badthetasx)
 	string w2d=nameofwave(center)
 	int wavenum=getfirstnum(w2d)
 	string cleaned=getprefix(w2d)+num2str(wavenum)+"cleaned"
-
 	duplicate/o center $cleaned
 
 

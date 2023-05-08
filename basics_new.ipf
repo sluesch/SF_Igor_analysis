@@ -117,6 +117,64 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 
 end
 
+function center_dSdN(int wavenum, string kenner)
+//wav is input wave, for example demod
+//centered is output name
+wave demod
+string centered=kenner+num2str(wavenum)+"centered"
+string centeravg=kenner+num2str(wavenum)+"centered_avg"
+string cleaned=kenner+num2str(wavenum)+"cleaned"
+string cleaned_avg=kenner+num2str(wavenum)+"cleaned_avg"
+
+
+//duplicate/o demod centered
+wave badthetasx
+
+string condfit_prefix="cst"; //this can become an input if needed
+string condfit_params_name=condfit_prefix+num2str(wavenum)+"fit_params"
+wave condfit_params = $condfit_params_name
+
+	duplicate/o/r=[][3] condfit_params mids
+
+	centering(demod,centered,mids)
+	wave temp=$centered
+
+	duplicate/o temp $cleaned
+
+
+	// removing lines with bad thetas;
+
+	variable i, idx
+	int nc
+	int nr
+	nr = dimsize(badthetasx,0) //number of rows
+	i=0
+	if (nr>0)
+		do
+			idx=badthetasx[i]-i //when deleting, I need the -i because if deleting in the loop the indeces of center change continously as points are deleted
+			DeletePoints/M=1 idx,1, $cleaned
+			i=i+1
+		while (i<nr)
+	endif
+//		WaveTransform zapnans $cleaned_avg
+//		WaveTransform zapnans $centeravg
+
+
+	avg_wav($cleaned)
+	avg_wav($centered)
+	display $cleaned_avg, $centeravg
+	makecolorful()
+//	wave center=$centeravg
+//	Extract/o/indx center,newx, (numtype(center[p])==0)
+//	wavestats center
+//	DeletePoints 0, 43, center 
+
+	
+
+	
+	
+end
+
 
 
 
