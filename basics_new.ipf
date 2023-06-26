@@ -266,36 +266,35 @@ function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 end  
 
 
-function resampleWave(wave wav,variable targetFreq )
+
+function/wave resampleWave(wave wav,variable targetFreq )
 	// resamples wave w from measureFreq
-	// to targetFreq (which should be lower than measureFreq)	
+	// to targetFreq (which should be lower than measureFreq)
 	string wn=nameOfWave(wav)
 	int wavenum=getfirstnum(wn)
-	string temp_name="dat"+num2str(wavenum)+"x_array"
-	
+
 	variable measureFreq
-//	struct ScanVars S
-//	fd_getScanVars(S,wavenum)
-struct AWGVars S
-fd_getoldAWG(S,wavenum)
+//		struct ScanVars S
+//		fd_getScanVars(S,wavenum)
+//	struct AWGVars S
+//	fd_getoldAWG(S,wavenum)
 
-	measureFreq=S.measureFreq
+	measureFreq=fd_getmeasfreq(wavenum)
 	variable N=measureFreq/targetFreq
+	wave temp_wave
+	duplicate/o wav, temp_wave
 
-	
+
 	RatioFromNumber (targetFreq / measureFreq)
 	if (V_numerator > V_denominator)
 		string cmd
 		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
 	endif
-	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 wav
-
-	//DeletePoints/M=1 25,370, wav
-	
+	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 temp_wave
 
 
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
-	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
+	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs?
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
 end
 
@@ -339,7 +338,7 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 //	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
 	
 	// Accessing freq conversion for wav
-	int wavenum = getfirstnum(wav_name)
+	int wavenum = getfirstnum(wav_name); print wavenum
 	variable freqfactor = 1/(fd_getmeasfreq(wavenum) * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
 //	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
 
@@ -399,6 +398,7 @@ function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, var
 	//Creating main wave copy and wave to display transform
 	int wavenum = getfirstnum(wav_name)
 	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
+	print fd_getmeasfreq(wavenum)
 
 
 	// Creating wave variables
@@ -445,20 +445,6 @@ Window Noise_check() : Graph
 EndMacro
 
 
-//function scfd_postFilterNumpts(raw_numpts, measureFreq)  // TODO: Rename to NumptsAfterFilter
-//    // Returns number of points that will exist after applying lowpass filter specified in ScanController_Fastdac
-//    variable raw_numpts, measureFreq
-//	
-//	nvar boxChecked = sc_ResampleFreqCheckFadc
-//	nvar targetFreq = sc_ResampleFreqFadc
-//	if (boxChecked)
-//	  	RatioFromNumber (targetFreq / measureFreq)
-//	  	return round(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
-//	else
-//		return raw_numpts
-//	endif
-//end
-
 function /s avg_wav(wave wav) // /WAVE lets your return a wave
 
 	//  averaging any wave over columns (in y direction)
@@ -490,7 +476,8 @@ function udh5([file_name])
 	// Loads HDF files back into Igor
 	string file_name
 	file_name = selectString(paramisdefault(file_name), file_name, "")
-	
+		variable refnum=startmstimer
+
 	string infile = wavelist("*",";","") // get wave list
 	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files
 
@@ -506,8 +493,7 @@ function udh5([file_name])
 	for(i=0; i<numHDF; i+=1) // loop over h5 filelist
 
 	   currentHDF = StringFromList(i,hdflist)
-	   	if (!stringmatch(currentHDF, "!*_RAW"))
-print currentHDF
+	   	//if (!stringmatch(currentHDF, "!*_RAW"))
 
 		HDF5OpenFile/P=data /R fileID as currentHDF
 		HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
@@ -525,10 +511,13 @@ print currentHDF
 		   endif
 		endfor
 		HDF5CloseFile fileID
-		endif
+		//endif
 	endfor
 
    print numloaded, "waves uploaded"
+   
+   	variable	ms=stopmstimer(refnum)
+	print ms/1e6
 end
 
 
@@ -539,7 +528,8 @@ function ud()
 	string infolder =  indexedfile(data,-1,".ibw")
 	string current, current1
 	variable numstrings = itemsinlist(infolder), i, curplace, numloaded=0
-	
+	variable refnum=startmstimer
+
 	for(i=0; i<numstrings; i+=1)
 		current1 = StringFromList(i,infolder)
 		current = current1[0,(strlen(current1)-5)]
@@ -550,6 +540,7 @@ function ud()
 		endif
 	endfor
 	print numloaded, "waves uploaded"
+
 end
 
 macro plot2d(num,dataset,disp)
@@ -587,10 +578,12 @@ ModifyGraph width=0,height=0
 	
 	
 	variable inc
-	inc=(V_max-V_min)/20
-	Button autoscale,pos={52.00,9.00},size={103.00,21.00},proc=ButtonProc_2,title="high contrast"
-	Button use_lookup,pos={49.00,35.00},size={105.00,23.00},proc=ButtonProc_5,title="use lookup"
-	Button linear,pos={163.00,9.00},size={50.00,20.00},proc=ButtonProc_6,title="linear"
+	inc=(V_max-V_min)/30
+	
+//	decommentize below for peaks like CB
+//	ModifyImage $wvname ctab= {inc,V_max-inc,ColdWarm,0};ModifyImage $wvname log=1
+
+ModifyImage $wvname ctabAutoscale=3
 	
 end
 end

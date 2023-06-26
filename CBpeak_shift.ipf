@@ -30,7 +30,7 @@ function dotcond_avg(wave wav, int refit,string kenner_out)
 	string neg_avg=split_neg+"_avg"
 	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
 	variable N
-	N=40// how many sdevs in thetas are acceptable?
+	N=4// how many sdevs in thetas are acceptable?
 
 
 
@@ -43,7 +43,7 @@ function dotcond_avg(wave wav, int refit,string kenner_out)
 	endif
 
 
-	split_wave( $cleaned,  0) //makes condxxxxcentered
+	split_wave( $cleaned,  0) //makes condxxxxcentered 
 	avg_wav($split_pos) // pos average
 	avg_wav($split_neg) // neg average
 	calc_avg_cond($pos_avg,$neg_avg,avg) // condxxxxavg
@@ -224,7 +224,7 @@ if(nr>0)
 
 	endfor
 
-makecolorful()
+//makecolorful()
 	ModifyGraph fSize=24
 	ModifyGraph gFont="Gill Sans Light"
 	//    ModifyGraph width={Aspect,1.62},height=300
@@ -309,6 +309,8 @@ function /wave fit_peak(wave current_array)
 	redimension/n=-1 current_array
 	duplicate/o current_array temp
 	temp=abs(current_array)
+	temp[0,10]=0;
+	temp[inf-10,inf]=0;
 	make/o/n=4 W_coef
 	wavestats/q temp
 	CurveFit/q lor current_array[round(V_maxrowloc-V_npnts/20),round(V_maxrowloc+V_npnts/20)] /D

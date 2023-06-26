@@ -88,9 +88,9 @@ function displayplot2D(start, endnum,whichdat,[delta,xnum, shiftx, shifty])
 
 end
 
-function displayplot(start, endnum,whichdat,[delta,shiftx, shifty])
+function displayplot(start, endnum,whichdat,prefix[delta,shiftx, shifty])
 	variable start, endnum
-	string whichdat
+	string whichdat,prefix
 	variable delta, shiftx, shifty
 	if(paramisdefault(delta))
 		delta=1
@@ -112,7 +112,7 @@ function displayplot(start, endnum,whichdat,[delta,shiftx, shifty])
 	Display /W=(35,53,960,830)
 	i=start
 	do
-		st="dat"+num2str(i)+whichdat
+		st=prefix+num2str(i)+whichdat
 		appendtograph $st
 		ModifyGraph offset($st)={totoffx,totoffy}
 		totoffx=totoffx+shiftx
@@ -223,3 +223,74 @@ function setcolorscale2d(percent)
 	ModifyImage '' ctab= {V_min,percent*V_max,PlanetEarth,0}
 	//killwaves mywave
 end
+
+
+function spectrum_analyzer(wave data, variable samp_freq)
+	// Built in powerspectrum function
+	duplicate/o data spectrum
+	SetScale/P x 0,1/samp_freq,"", spectrum
+	variable nr=dimsize(spectrum,0);  print nr
+	variable le=2^(floor(log(nr)/log(2))); print le
+	wave slice;
+	wave w_Periodogram
+
+	variable i=0
+	rowslice(spectrum,i)
+		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
+	duplicate/o w_Periodogram, powerspec
+	i=1
+	do
+		rowslice(spectrum,i)
+		DSPPeriodogram/R=[1,(le)]/DB/NODC=1/DEST=W_Periodogram slice
+		powerspec=powerspec+W_periodogram
+		i=i+1
+	while(i<dimsize(spectrum,1))
+	powerspec[0]=nan
+	display powerspec; SetAxis bottom 0,500
+
+end
+
+
+function tune_dot_plots(wave filenums, wave nose, wave plunger,string kenner)
+
+// nose and plunger are the gates that are stepped. 
+// modify iff statement to filter out gate values that are of interest
+variable i=0
+variable idx
+variable V_npnts
+wavestats/q filenums
+wave W_coef,result
+closeallgraphs()
+do
+idx=filenums[i]
+if (nose[i]<0 && nose[i]>-260)
+//if ((mod(check[i],20)==0)&&(check[i]<-250))
+
+string wav_name="dat"+num2str(idx)+kenner;
+print wav_name
+display; appendimage $wav_name
+ModifyImage '' log=1
+ModifyImage '' ctab= {0.042,1,ColdWarm,0}
+
+	Label bottom "RC2"
+	Label left "CSS"
+	TextBox/C/N=text0 wav_name
+	TextBox/C/N=text1 "plunger="+num2str(plunger[i])+" / nose="+num2str(nose[i])
+	TextBox/C/N=text1/A=LB/X=9.63/Y=17.14
+
+
+
+//diffwave($wav_name)
+
+
+doupdate
+endif
+i=i+1
+
+while(i<V_npnts)
+//TileWindows/A=(2,4)/O=1 
+TileWindows/O=1/C/P
+
+end
+
+

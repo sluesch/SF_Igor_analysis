@@ -234,8 +234,8 @@ function fd_getoldAWG(S,datnum,[fastdac_num])
 	//	JSONXOP_GetValue/V fd_id, "/AWG/initialized"
 	//	S.initialized=V_value
 
-	JSONXOP_GetValue/V fd_id, "/AWG/AWG_used"
-	S.use_AWG=V_value
+//	JSONXOP_GetValue/V fd_id, "/AWG/AWG_used"
+//	S.use_AWG=V_value
 
 	S.lims_checked=0; //always 0
 
@@ -300,6 +300,37 @@ function fd_getmeasfreq(datnum,[fastdac_num])
 
 end
 
+function fd_log(datnum,[fastdac_num])
+	// Function to get old h5 values for measurement frequency
+	variable datnum, fastdac_num
+	variable sl_id, fd_id  //JSON ids
+	variable freq
+	fastdac_num = paramisdefault(fastdac_num) ? 1 : fastdac_num
+
+	if(fastdac_num != 1)
+		abort "WARNING: This is untested... remove this abort if you're feeling lucky!"
+	endif
+
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
+	fd_id = getJSONXid(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
+
+	// Get variable parts
+
+	//	JSONXOP_GetValue/V fd_id, "/AWG/initialized"
+	//	S.initialized=V_value
+make/o/N=2 FDvalues
+	JSONXOP_GetValue/V fd_id, "MeasureFreq"
+	FDvalues[0]=V_value
+	
+	JSONXOP_GetValue/V fd_id, "DAC1"
+	FDvalues[1]=V_value
+
+	JSONXOP_Release /A  //Clear all stored JSON strings
+	
+	return freq
+
+end
+
 
 
 
@@ -330,6 +361,63 @@ Structure AWGVars
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
+endstructure
+
+
+/////////////////////////////////////////////////
+//////////////////  ScanVars /////////////////// (scv_...)
+////////////////////////////////////////////////
+
+// Structure to hold scan information (general to all scans) 
+// Note: If modifying this, also modify the scv_setLastScanVars and scv_getLastScanVars accordingly (and to have it save to HDF, modify sc_createSweepLogs)
+structure ScanVars
+    variable instrIDx
+    variable instrIDy // If using a second device for second axis of a scan (otherwise should be same as instrIDx)
+    
+    variable lims_checked // Flag that gets set to 1 after checks on software limits/ramprates etc has been carried out (particularly important for fastdac scans which has no limit checking for the sweep)
+
+    string channelsx
+    variable startx, finx, numptsx, rampratex
+    variable delayx  // delay after each step for Slow scans (has no effect for Fastdac scans)
+    string startxs, finxs  // If sweeping from different start/end points for each channel or instrument
+
+    // For 2D scans
+    variable is2d
+    string channelsy 
+    variable starty, finy, numptsy, rampratey 
+    variable delayy  // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
+    string startys, finys  // Similar for Y-axis
+
+    // For specific scans
+    variable alternate  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
+    variable duration   // Can specify duration of scan rather than numpts or sweeprate for readVsTime
+	 variable readVsTime // Set to 1 if doing a readVsTime
+	 variable interlaced_y_flag // Whether there are different values being interlaced in the y-direction of the scan
+	 string interlaced_channels // Channels that the scan will interlace between 
+	 string interlaced_setpoints // Setpoints of each channel to interlace between e.g. "0,1,2;0,10,20" will expect 2 channels (;) which interlace between 3 values each (,)
+	 variable interlaced_num_setpoints // Number of setpoints for each channel (calculated in InitScanVars)
+	 variable prevent_2d_graph_updates // For fast x sweeps with large numptsy (e.g. 2k x 10k) the 2D graph update time becomes significant
+
+    // Other useful info
+    variable start_time // Should be recorded right before measurements begin (e.g. after all checks are carried out)
+    variable end_time // Should be recorded right after measurements end (e.g. before getting sweeplogs etc)
+    string x_label // String to show as x_label of scan (otherwise defaults to gates that are being swept)
+    string y_label  // String to show as y_label of scan (for 2D this defaults to gates that are being swept)
+    variable using_fastdac // Set to 1 when using fastdac
+    string comments  // Additional comments to save in HDF sweeplogs (easy place to put keyword flags for later analysis)
+
+    // Specific to Fastdac 
+    variable numADCs  // How many ADCs are being recorded 
+    variable samplingFreq, measureFreq  // measureFreq = samplingFreq/numADCs 
+    variable sweeprate  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)
+    string adcList // Which adcs' are being recorded
+	 string raw_wave_names  // Names of waves to override the names raw data is stored in for FastDAC scans
+	 
+	 // Backend use
+     variable direction   // For keeping track of scan direction when using alternating scan
+	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
+	 variable filenum 		// Filled when getting saved
+
 endstructure
 
 
