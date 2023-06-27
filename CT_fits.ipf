@@ -465,3 +465,110 @@ function dotcond_centering(wave waved, string kenner_out)
 	copyscales waved new2dwave
 	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
 End
+
+function/wave sqw_analysis(wave wav, int delay, int wavelen)
+
+// this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
+	variable nr, nc
+	nr=dimsize(wav,0)
+	nc=dimsize(wav,1)
+	variable i=0
+	variable N
+	N=nr/wavelen/4;
+
+	Make/o/N=(nc,(N)) cold1, cold2, hot1, hot2
+	wave slice, slice_new
+
+	do
+		rowslice(wav,i)
+		Redimension/N=(wavelen,4,N) slice
+		DeletePoints/M=0 0,delay, slice
+		reducematrixSize(slice,0,-1,1,0,-1,4,1,"slice_new")
+
+		cold1[i][]=slice_new[0][0][q]
+		cold2[i][]=slice_new[0][2][q]
+		hot1[i][]=slice_new[0][1][q]
+		hot2[i][]=slice_new[0][3][q]
+
+
+		i=i+1
+	while(i<nc)
+
+	duplicate/o cold1, cold; cold=(cold1+cold2)/2
+	duplicate/o hot1, hot; hot=(hot1+hot2)/2
+
+	matrixtranspose hot
+	matrixtranspose cold
+
+	CopyScales wav, cold, hot
+	
+	duplicate/o hot, nument
+	nument=cold-hot;
+
+end
+
+
+function center_demod(int filenum, int delay, int wavelen)
+string wname="dat"+num2str(filenum)+"cscurrent_2d";
+sqw_analysis($wname,delay,wavelen)
+wave cold, hot, cold_avg, hot_avg,W_coef
+avg_wav(cold);
+avg_wav(hot)
+display hot_avg, cold_avg
+DeletePoints 5,1, W_coef
+    W_coef[0]= {-0.0546777,0.882581,11.9077,-16.7818,7.74687e-05}
+    
+    FuncFit/TBOX=768 Chargetransition W_coef cold_avg /D 
+    duplicate/o W_coef, cold_r
+    
+    FuncFit/TBOX=768 Chargetransition W_coef hot_avg /D 
+    duplicate/o W_coef, hot_r
+    
+ variable   Go= (cold_r[0]+hot_r[0])/2
+ variable   dT=(2*1.4*(hot_r[2]-cold_r[2])); print dT
+   
+ W_coef[0]= {0.0531997,0.880123,10.688,-12.024,7.28489e-05,7.50215e-08}
+
+
+ctrans_avg(cold,1,0, "ct", average=0)
+wave ct0fit_params
+duplicate/o/r=[][3] ct0fit_params mids
+string wname1="dat"+num2str(filenum)+"cscurrentx_2d";
+wave nument
+centering($wname1,"entropy",mids) // centred plot and average plot
+centering(nument,"numentropy",mids) // centred plot and average plot
+
+wave entropy, entropy_avg, numentropy, numentropy_avg
+avg_wav(entropy); 
+avg_wav(numentropy)
+entropy_avg=entropy_avg*2;
+
+wavetransform zapnans entropy_avg
+wavetransform zapnans numentropy_avg
+
+Integrate entropy_avg/D=entropy_avg_INT;
+Integrate numentropy_avg/D=numentropy_avg_INT;
+entropy_avg_int=entropy_avg_INT/abs(Go)/dT
+numentropy_avg_int=numentropy_avg_INT/abs(Go)/dT
+
+execute("intent_graph()")
+end
+
+Window intent_graph() : Graph
+	PauseUpdate; Silent 1		// building window...
+	Display /W=(35,53,963,831) entropy_avg,numentropy_avg
+	AppendToGraph/R entropy_avg_INT,numentropy_avg_INT
+	ModifyGraph lSize=2
+	ModifyGraph lStyle(numentropy_avg)=7,lStyle(numentropy_avg_INT)=7
+	ModifyGraph rgb(entropy_avg_INT)=(4369,4369,4369),rgb(numentropy_avg_INT)=(4369,4369,4369)
+	ModifyGraph zero(right)=15
+	SetAxis right -0.214813472615588,1.08782205796658
+	Legend/C/N=text1/J/X=8.20/Y=44.46 "\\s(entropy_avg) entropy_avg\r\\s(numentropy_avg) numentropy_avg\r\\s(entropy_avg_INT) entropy_avg_INT"
+	AppendText "\\s(numentropy_avg_INT) numentropy_avg_INT"
+	SetDrawLayer UserFront
+	SetDrawEnv xcoord= axrel,ycoord= right,linethick= 2,linefgc= (65535,0,26214),dash= 7
+	DrawLine 0,0.693147,1,0.693147
+	DrawLine 0,1.09861,1,1.09861
+	SetDrawEnv xcoord= prel,ycoord= right,linethick= 2,linefgc= (1,4,52428)
+	DrawLine 0,1.09861,1,1.09861
+EndMacro
