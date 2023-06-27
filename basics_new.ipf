@@ -463,6 +463,8 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	return avg_name
 end
 
+
+
 function stopalltimers()
 variable i
 i=0

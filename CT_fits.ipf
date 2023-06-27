@@ -49,10 +49,7 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 	wave badthetasx
 	wave badgammasx
 
-	//remove_noise($datasetname);
 
-
-	//resampleWave($datasetname,600);
 	string quickavg=avg_wav($datasetname) // averages datasetname and returns the name of the averaged wave
 
 	if (refit==1)
@@ -176,6 +173,7 @@ function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx,
 	wave W_coef
 	wave W_sigma
 
+	duplicate/o wavenm, temp_wave
 
 
 	nr = dimsize(wavenm,0) //number of rows (total sweeps)
@@ -184,7 +182,7 @@ function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx,
 	make /N= (nc , 12) /o $fit_params_name
 	wave fit_params = $fit_params_name
 //reduce_and_chop(wavenm, 5000)
-resampleWave(wavenm,1000 )
+//resampleWave(wavenm,1000 )
 	for (i=0; i < nc ; i+=1)
 
 rowslice(temp_wave,i)
