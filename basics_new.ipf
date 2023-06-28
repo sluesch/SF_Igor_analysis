@@ -84,18 +84,6 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 	temp=temp*pi/2;
 	
 	
-//	display
-//	appendimage temp
-
-//	display
-//	appendimage sinewave
-
-//	Duplicate /o sine1d, wave0x
-//	wave0x = x
-//
-//	display wav vs wave0x
-//	appendtoGraph sine1d
-//
 
 	
 	print "cols = " + num2str(cols)
@@ -103,17 +91,7 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 	print "(cols/period/nofcycles) = " + num2str(cols/period/nofcycles)
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1, "demod")
 	
-//	display 
-////	display wav
-//	appendimage temp
-//	display temp
-//wn="demod"
-//	if (append2hdf)
-//		variable fileid
-//		fileid=get_hdfid(datnum) //opens the file
-//		HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
-//		HDF5CloseFile/a fileid
-//	endif
+
 
 end
 
@@ -458,8 +436,13 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 
 	nr = dimsize($wn,0) //number of rows (sweep length)
 	nc = dimsize($wn,1) //number of columns (repeats)
+
 	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, 1,1, avg_name)
 	redimension/n=-1 $avg_name
+	variable new_nr = dimsize($avg_name,0) //number of rows (sweep length)
+	variable s=round((nr-new_nr)/2)
+	wavetransform/o/p={s,nan} shift $avg_name
+
 	return avg_name
 end
 
