@@ -42,7 +42,18 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 	wave fit_params = $fit_params_name
 
 
-	variable N=4; // how many sdevs are acceptable?
+	variable N=2; // how many sdevs are acceptable?
+	if (dimsize(wav,0)>1e4)
+notch_filters(wav, Hzs="60;180;300",  Qs="20;150;250"); 
+string nfname=datasetname+"_nf"; 
+wave temp_wave
+resampleWave($nfname,300 );
+duplicate/o temp_wave $datasetname
+endif
+
+closeallGraphs(); display
+
+
 
 
 	wave W_coef
@@ -151,6 +162,7 @@ function /wave fit_transition(current_array,minx,maxx)
 	removefromgraph /all; appendtoGraph current_array
 	FuncFit/q /TBOX=768 CT_faster W_coef current_array(minx,maxx) /D
 	makecolorful(); doupdate
+//	sleep/s 1
 end
 
 
@@ -181,7 +193,9 @@ function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx,
 	make /N= (nc , 12) /o $fit_params_name
 	wave fit_params = $fit_params_name
 //reduce_and_chop(wavenm, 5000)
-//resampleWave(wavenm,1000 )
+print dimsize(wavenm,0); print dimsize(temp_wave,0) 
+//resampleWave(wavenm,300 );
+print dimsize(wavenm,0); print dimsize(temp_wave,0) 
 	for (i=0; i < nc ; i+=1)
 
 rowslice(temp_wave,i)
@@ -305,11 +319,28 @@ function /wave cleaning(wave center, wave badthetasx)
 		do
 			idx=badthetasx[i]-i //when deleting, I need the -i because if deleting in the loop the indeces of center change continously as points are deleted
 			DeletePoints/M=1 idx,1, $cleaned
+			DeletePoints/M=1 idx,1, center
+
 			i=i+1
 		while (i<nr)
 	endif
 end
 
+function find_thetas_smaller(variable  val)
+wave thetas
+Duplicate/o thetas,reduced;
+reduced = thetas[p] > val ? p : NaN
+redimension/n=-1 reduced
+WaveTransform zapnans reduced
+end
+
+function find_thetas_larger(variable  val)
+wave thetas
+Duplicate/o thetas,reduced;
+reduced = thetas[p] > val ? p : NaN
+redimension/n=-1 reduced
+WaveTransform zapnans reduced
+end
 
 function prepfigs(wavenum,N,kenner, kenner_out, minx, maxx)
 	variable wavenum,N
@@ -444,8 +475,8 @@ function/wave sqw_analysis(wave wav, int delay, int wavelen)
 
 // this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
 	variable nr, nc
-	nr=dimsize(wav,0)
-	nc=dimsize(wav,1)
+	nr=dimsize(wav,0); print nr
+	nc=dimsize(wav,1); print nc
 	variable i=0
 	variable N
 	N=nr/wavelen/4;
@@ -487,19 +518,24 @@ string wname="dat"+num2str(filenum)+"cscurrent_2d";
 sqw_analysis($wname,delay,wavelen)
 wave W_coef, cold, hot  
 W_coef[0]= {0.0531997,0.880123,10.688,-12.024,7.28489e-05,7.50215e-08}
+ W_coef[0]= {-0.0277372,0.860164,21.0104,-106.633,8.64866e-05}
+
 ctrans_avg(cold,1,0, "ct", average=0)
 wave ct0fit_params
 duplicate/o/r=[][3] ct0fit_params mids
 string wname1="dat"+num2str(filenum)+"cscurrentx_2d";
 
 wave demod
-demodulate(filenum, 2, "cscurrent_2d")
+//demodulate(filenum, 2, "cscurrent_2d")
 
 wave nument
-centering(demod,"entropy",mids) // centred plot and average plot
+centering($wname1,"entropy",mids) // centred plot and average plot
 centering(nument,"numentropy",mids) // centred plot and average plot
+find_thetas_larger(30) // makes wave called reduced
+wave entropy, entropy_avg, numentropy, numentropy_avg, reduced
+cleaning(entropy, reduced); 
+cleaning(nument, reduced); 
 
-wave entropy, entropy_avg, numentropy, numentropy_avg
 avg_wav(entropy); 
 avg_wav(numentropy)
 entropy_avg=entropy_avg*2;
@@ -555,15 +591,13 @@ Window intent_graph() : Graph
 	PauseUpdate; Silent 1		// building window...
 	Display /W=(1471,53,2142,499) entropy_avg,numentropy_avg
 	AppendToGraph/R entropy_avg_INT,numentropy_avg_INT
-	AppendToGraph fit_entropy_avg
 	ModifyGraph lSize(entropy_avg)=2,lSize(numentropy_avg)=2,lSize(entropy_avg_INT)=2
 	ModifyGraph lSize(numentropy_avg_INT)=2
 	ModifyGraph lStyle(numentropy_avg)=7,lStyle(numentropy_avg_INT)=7
 	ModifyGraph rgb(entropy_avg_INT)=(4369,4369,4369),rgb(numentropy_avg_INT)=(4369,4369,4369)
-	ModifyGraph rgb(fit_entropy_avg)=(0,0,65535)
 	ModifyGraph zero(right)=15
 	Legend/C/N=text1/J/X=67.51/Y=8.48 "\\s(entropy_avg) entropy_avg\r\\s(numentropy_avg) numentropy_avg\r\\s(entropy_avg_INT) entropy_avg_INT"
-	AppendText "\\s(numentropy_avg_INT) numentropy_avg_INT\r\\s(fit_entropy_avg) fit_entropy_avg"
+	AppendText "\\s(numentropy_avg_INT) numentropy_avg_INT"
 	SetDrawLayer UserFront
 	SetDrawEnv xcoord= axrel,ycoord= right,linethick= 2,linefgc= (65535,0,26214),dash= 7
 	DrawLine 0,0.693147,1,0.693147
@@ -578,6 +612,10 @@ function calc_scaling(wave cold,wave hot, wave mids)
 
 centering(cold,"cold_centr",mids) // centred plot and average plot
 centering(hot,"hot_centr",mids) // centred plot and average plot
+wave reduced
+cleaning(cold, reduced); 
+cleaning(hot, reduced); 
+
 
 wave cold_centr,hot_centr, cold_centr_avg, hot_centr_avg, W_coef
 avg_wav(cold_centr);

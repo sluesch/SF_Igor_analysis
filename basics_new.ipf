@@ -446,6 +446,31 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	return avg_name
 end
 
+function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
+
+	//  averaging any wave over columns (in y direction)
+	// wave returned is avg_name
+	string wn=nameofwave(wav)
+	string avg_name=wn+"_avg";
+	int nc
+	int nr
+
+//	wn="dat"+num2str(wavenum)+dataset //current 2d array
+
+	nr = dimsize($wn,0) //number of rows (sweep length)
+	nc = dimsize($wn,1) //number of columns (repeats)
+
+	ReduceMatrixSize(wav, 0, -1, N, 0,-1, 1,1, avg_name)
+	redimension/n=-1 $avg_name
+	variable new_nr = dimsize($avg_name,0) //number of rows (sweep length)
+	variable s=round((nr-new_nr)/2)
+	wavetransform/o/p={s,nan} shift $avg_name
+
+	return avg_name
+end
+
+
+
 
 
 function stopalltimers()
