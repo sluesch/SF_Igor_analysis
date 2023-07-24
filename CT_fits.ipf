@@ -158,11 +158,14 @@ function /wave fit_transition(current_array,minx,maxx)
 
 
 	wave W_coef
+	 // W_coef[0]= {-0.03095,1.29277,7.82084,-334.495,4.46489e-05,0}
 
 	removefromgraph /all; appendtoGraph current_array
-	FuncFit/q /TBOX=768 CT_faster W_coef current_array(minx,maxx) /D
-	makecolorful(); doupdate
-//	sleep/s 1
+	//FuncFit/q /TBOX=768 CT_faster W_coef current_array(minx,maxx) /D
+	FuncFit/H="000001"/TBOX=768 Chargetransition W_coef current_array(minx,maxx) /D
+	makecolorful(); 
+	doupdate
+	//sleep/s 1
 end
 
 
@@ -414,25 +417,24 @@ Function Chargetransition(w,x) : FitFunc
 	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
 	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
 	//CurveFitDialog/ Equation:
-	//CurveFitDialog/ f(x) = Amp*tanh((x - Mid)/(2*theta)) + Linear*x + Const
-
+	//CurveFitDialog/ f(x) = Amp*tanh((x - Mid)/(2*Theta)) + Linear*x + Const+0*padder
 	//CurveFitDialog/ End of Equation
 	//CurveFitDialog/ Independent Variables 1
 	//CurveFitDialog/ x
-	//CurveFitDialog/ Coefficients 5
+	//CurveFitDialog/ Coefficients 6
 	//CurveFitDialog/ w[0] = Amp
 	//CurveFitDialog/ w[1] = Const
 	//CurveFitDialog/ w[2] = Theta
 	//CurveFitDialog/ w[3] = Mid
 	//CurveFitDialog/ w[4] = Linear
+	//CurveFitDialog/ w[5] = padder
 
-
-	return w[0]*tanh((x - w[3])/(2*w[2])) + w[4]*x + w[1]
+	return w[0]*tanh((x - w[3])/(2*w[2])) + w[4]*x + w[1]+0*w[5]
 End
 
 Function CT_faster(w,ys,xs) : FitFunc
 	Wave w, xs, ys
-	ys= w[0]*tanh((xs - w[3])/(-2*w[2])) + w[4]*xs + w[1]+w(5)*xs^2
+	ys= w[0]*tanh((xs - w[3])/(-2*w[2])) + w[4]*xs + w[1]+w(5)*xs^2+w[5]*0
 End
 
 Function CT2(w,x) : FitFunc
@@ -526,7 +528,7 @@ duplicate/o/r=[][3] ct0fit_params mids
 string wname1="dat"+num2str(filenum)+"cscurrentx_2d";
 
 wave demod
-//demodulate(filenum, 2, "cscurrent_2d")
+demodulate(filenum, 2, "cscurrent_2d")
 
 wave nument
 centering($wname1,"entropy",mids) // centred plot and average plot

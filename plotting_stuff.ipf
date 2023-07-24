@@ -225,31 +225,91 @@ function setcolorscale2d(percent)
 end
 
 
-function spectrum_analyzer(wave data, variable samp_freq)
-	// Built in powerspectrum function
-	duplicate/o data spectrum
-	SetScale/P x 0,1/samp_freq,"", spectrum
-	variable nr=dimsize(spectrum,0);  print nr
-	variable le=2^(floor(log(nr)/log(2))); print le
-	wave slice;
-	wave w_Periodogram
 
-	variable i=0
-	rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
-	duplicate/o w_Periodogram, powerspec
-	i=1
-	do
-		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)]/DB/NODC=1/DEST=W_Periodogram slice
-		powerspec=powerspec+W_periodogram
-		i=i+1
-	while(i<dimsize(spectrum,1))
-	powerspec[0]=nan
-	display powerspec; SetAxis bottom 0,500
+function spectrum_analyzer(wave data, int cutoff, int newplot)
+    // This function performs spectrum analysis on a given wave data
+    // data: The input wave for spectrum analysis
+
+    // Built-in powerspectrum function
+    variable filenum = getfirstnum(nameOfWave(data))
+    variable samp_freq = fd_getmeasfreq(filenum);
+    wave dat4360cscurrent_2dslice,dat4360cscurrent_2dspectrum,dat4360cscurrent_2dintspec
+    if (newplot==1)
+    closeallGraphs()
+    Display /W=(35,53,1046,664) 
+	appendtograph dat4360cscurrent_2dspectrum
+	appendtoGraph/r dat4360cscurrent_2dintspec
+	Display /W=(1047,53,2085,663)
+
+	appendtograph/r dat4360cscurrent_2dslice
+    endif
+    
+
+    // Duplicate the data wave to spectrum
+    duplicate/o data spectrum
+
+    // Set the x-axis scale of spectrum
+    SetScale/P x 0, 1/samp_freq, "", spectrum
+
+    variable nr = dimsize(spectrum, 0)
+
+    wave slice
+    wave powerspec, sum_power
+
+    variable i = 0
+    variable N, V_avg
+
+    // Slice the spectrum wave at index i
+    rowslice(spectrum, i)
+
+
+
+// Subtract V_avg from slice and calculate the spectrum
+wavestats/q slice;slice=slice-V_avg
+fd_calculate_spectrum(slice, linear=1)
+duplicate/o powerspec, sum_power
+string toplot=nameOfWave(data)+"slice"
+duplicate/o slice,$toplot
+
+i=1
+do
+    // Slice the spectrum wave at index i
+    rowslice(spectrum,i);
+    wavestats/q slice;slice=slice-V_avg
+
+    // Add powerspec and sum_power to sum+power
+    sum_power=powerspec+sum_power
+    i=i+1
+while(i<dimsize(spectrum,1))
+
+// Set the first element of powerspec to 0
+sum_power=sum_power/dimsize(spectrum,1);
+sum_power[0,x2pnt(sum_power,cutoff)]=0
+
+string spec_name=nameofWave(data)+"spectrum"
+duplicate/o sum_power, $spec_name
+Resample/RATE=1 $spec_name
+Dowindow/F graph0
+appendtograph $spec_name; ModifyGraph log(left)=1
+string intspecname=nameOfWave(data)+"intspec" 
+Integrate sum_power/D=$intspecname;
+
+appendtoGraph/r/w=graph0 $intspecname
+makecolorful();legend
+Dowindow/F graph1
+
+appendtoGraph/r/w=graph1 $toplot
+legend
+
+
+
+
+ 
+ 
+
+// display slice
 
 end
-
 
 function tune_dot_plots(wave filenums, wave nose, wave plunger,string kenner)
 

@@ -482,11 +482,32 @@ i=i+1
 while(i<9)
 end
 
-function udh5([file_name])
+function dat2num(string datname)
+	variable datnum
+	
+	sscanf datname,"dat%d", datnum
+	return datnum
+end
+
+function udh5([file_name,range,noraw])
 	// Loads HDF files back into Igor
 	string file_name
+	string range //Optional semicolon-separated list of start and end points. If range="startnum;endnum", only dat files between startnum and endnum inclusive will be loaded
+	variable noraw //set noraw=1 if you don't want raw datasets to be loaded
+	
+	variable startnum, endnum, exclude
+	if (!(paramisDefault(range)))
+		startnum = str2num(stringfromlist(0,range))
+		endnum = str2num(stringfromlist(1,range))
+	endif
+	if (paramisDefault(noraw))
+		noraw=0
+	endif
+
+
+	
 	file_name = selectString(paramisdefault(file_name), file_name, "")
-		variable refnum=startmstimer
+	variable refnum=startmstimer
 
 	string infile = wavelist("*",";","") // get wave list
 	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files
@@ -504,7 +525,18 @@ function udh5([file_name])
 
 	   currentHDF = StringFromList(i,hdflist)
 	   	//if (!stringmatch(currentHDF, "!*_RAW"))
-
+	   	
+	   	exclude = 0
+	   	if (stringmatch(currentHDF, "*_RAW*") && noraw)
+	   		exclude=1
+	   	endif
+	   	if (!(paramisDefault(range)))
+	   		if ((dat2num(currenthdf)<startnum)||(dat2num(currenthdf)>endnum))
+	   			exclude=1
+	   		endif
+	   	endif
+	   	
+	   	if (!(exclude))
 		HDF5OpenFile/P=data /R fileID as currentHDF
 		HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
 		datasets = S_HDF5ListGroup
@@ -521,14 +553,65 @@ function udh5([file_name])
 		   endif
 		endfor
 		HDF5CloseFile fileID
+		endif
 		//endif
 	endfor
+	
 
    print numloaded, "waves uploaded"
    
    	variable	ms=stopmstimer(refnum)
 	print ms/1e6
 end
+
+
+//function udh5([file_name])
+//	// Loads HDF files back into Igor
+//	string file_name
+//	file_name = selectString(paramisdefault(file_name), file_name, "")
+//		variable refnum=startmstimer
+//
+//	string infile = wavelist("*",";","") // get wave list
+//	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files
+//
+//	string currentHDF="", currentWav="", datasets="", currentDS
+//	if (!stringmatch(file_name, ""))
+//		hdflist = file_name + ".h5"
+//	endif
+//	
+//	variable numHDF = itemsinlist(hdflist), fileid=0, numWN = 0, wnExists=0
+//	variable i=0, j=0, numloaded=0
+//
+//
+//	for(i=0; i<numHDF; i+=1) // loop over h5 filelist
+//
+//	   currentHDF = StringFromList(i,hdflist)
+//	   	//if (!stringmatch(currentHDF, "!*_RAW"))
+//
+//		HDF5OpenFile/P=data /R fileID as currentHDF
+//		HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
+//		datasets = S_HDF5ListGroup
+//		numWN = itemsinlist(datasets)
+//		currentHDF = currentHDF[0,(strlen(currentHDF)-4)]
+//		for(j=0; j<numWN; j+=1) // loop over datasets within h5 file
+//			currentDS = StringFromList(j,datasets)
+//			currentWav = currentHDF+currentDS
+//		   wnExists = FindListItem(currentWav, infile,  ";")
+//		   if (wnExists==-1)
+//		   	// load wave from hdf
+//		   	HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
+//		   	numloaded+=1
+//		   endif
+//		endfor
+//		HDF5CloseFile fileID
+//		//endif
+//	endfor
+//
+//   print numloaded, "waves uploaded"
+//   
+//   	variable	ms=stopmstimer(refnum)
+//	print ms/1e6
+//end
 
 
 
