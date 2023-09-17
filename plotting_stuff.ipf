@@ -233,15 +233,9 @@ function spectrum_analyzer(wave data, int cutoff, int newplot)
     // Built-in powerspectrum function
     variable filenum = getfirstnum(nameOfWave(data))
     variable samp_freq = fd_getmeasfreq(filenum);
-    wave dat4360cscurrent_2dslice,dat4360cscurrent_2dspectrum,dat4360cscurrent_2dintspec
     if (newplot==1)
     closeallGraphs()
     Display /W=(35,53,1046,664) 
-	appendtograph dat4360cscurrent_2dspectrum
-	appendtoGraph/r dat4360cscurrent_2dintspec
-	Display /W=(1047,53,2085,663)
-
-	appendtograph/r dat4360cscurrent_2dslice
     endif
     
 
@@ -261,12 +255,13 @@ function spectrum_analyzer(wave data, int cutoff, int newplot)
 
     // Slice the spectrum wave at index i
     rowslice(spectrum, i)
+    display slice
 
 
 
 // Subtract V_avg from slice and calculate the spectrum
 wavestats/q slice;slice=slice-V_avg
-fd_calculate_spectrum(slice, linear=1)
+calculate_spectrum(slice, linear=1)
 duplicate/o powerspec, sum_power
 string toplot=nameOfWave(data)+"slice"
 duplicate/o slice,$toplot
@@ -296,10 +291,10 @@ Integrate sum_power/D=$intspecname;
 
 appendtoGraph/r/w=graph0 $intspecname
 makecolorful();legend
-Dowindow/F graph1
-
-appendtoGraph/r/w=graph1 $toplot
-legend
+//Dowindow/F graph1
+//
+//appendtoGraph/r/w=graph1 $toplot
+//legend
 
 
 

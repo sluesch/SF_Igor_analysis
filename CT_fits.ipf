@@ -9,6 +9,9 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 	// dotcondcentering tells whether to use conductance data to center the CT data
 	// kenner_out is the prefix to replace dat for this analysis
 	// kenner_out and condfit_prefix can not contain a number otherwise getfirstnu will not work
+	print dimsize(wav,0)
+		print dimsize(wav,1)
+
 	variable refnum, ms
 	//	option to limit fit to indexes [minx,maxx]
 
@@ -42,14 +45,15 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 	wave fit_params = $fit_params_name
 
 
-	variable N=2; // how many sdevs are acceptable?
-	if (dimsize(wav,0)>1e4)
-notch_filters(wav, Hzs="60;180;300",  Qs="20;150;250"); 
-string nfname=datasetname+"_nf"; 
-wave temp_wave
-resampleWave($nfname,300 );
-duplicate/o temp_wave $datasetname
-endif
+	variable N=10; // how many sdevs are acceptable?
+//	if (dimsize(wav,0)>1e4)
+////notch_filters(wav, Hzs="60;180;300",  Qs="20;150;250"); 
+//
+//string nfname=datasetname+"_nf"; 
+//wave temp_wave
+////resampleWave($nfname,300 );
+//duplicate/o temp_wave $datasetname
+//endif
 
 closeallGraphs(); display
 
@@ -87,11 +91,12 @@ closeallGraphs(); display
 		print condfit_params_name
 		wave condfit_params = $condfit_params_name
 		find_plot_gammas(condfit_params_name,N)
-		plot_badgammas($centered)
 		duplicate/o/r=[][2] condfit_params mids
 
 		centering($datasetname,centered,mids)
 		cleaning($centered,badgammasx)
+		plot_badgammas($centered)
+
 	endif
 
 	if (average==1) // sometimes we do not want to average
@@ -139,7 +144,7 @@ function /wave get_initial_params(sweep)
 	variable lin = 0.001  // differentiated value of flat area?
 
 	Make /D/N=6/O W_coef
-	W_coef[0] = {amp,const,theta,mid,lin,0}
+	W_coef[0] = {amp,const,theta,mid,lin,0,0}; print W_coef
 
 	killwaves extractedwave, sweepsmooth
 	return W_coef
@@ -158,11 +163,17 @@ function /wave fit_transition(current_array,minx,maxx)
 
 
 	wave W_coef
+	wave/t T_Constraints 
+
 	 // W_coef[0]= {-0.03095,1.29277,7.82084,-334.495,4.46489e-05,0}
+	   W_coef[0]= {-0.00422886,0.216177,225.6,32.8403,-2.42636e-07,0}
+	   T_Constraints[0]= {"K0 > -0.1","K0 < 0","K1 > 0","K1 < 0.5","K2 > 0","K3 > -500","K3 < 500"}
+
+
 
 	removefromgraph /all; appendtoGraph current_array
 	//FuncFit/q /TBOX=768 CT_faster W_coef current_array(minx,maxx) /D
-	FuncFit/H="000001"/TBOX=768 Chargetransition W_coef current_array(minx,maxx) /D
+	FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef current_array(minx,maxx) /D /C=T_Constraints 
 	makecolorful(); 
 	doupdate
 	//sleep/s 1
@@ -191,7 +202,8 @@ function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx,
 
 
 	nr = dimsize(wavenm,0) //number of rows (total sweeps)
-	nc = dimsize(wavenm,1) //number of columns (data points)
+	nc = dimsize(wavenm,1) //number of columns (data points); 
+	//nc=10
 	
 	make /N= (nc , 12) /o $fit_params_name
 	wave fit_params = $fit_params_name
@@ -429,12 +441,12 @@ Function Chargetransition(w,x) : FitFunc
 	//CurveFitDialog/ w[4] = Linear
 	//CurveFitDialog/ w[5] = padder
 
-	return w[0]*tanh((x - w[3])/(2*w[2])) + w[4]*x + w[1]+0*w[5]
+	return w[0]*tanh((x - w[3])/(2*w[2])) + w[4]*x + w[1]+x^2*w[5]
 End
 
 Function CT_faster(w,ys,xs) : FitFunc
 	Wave w, xs, ys
-	ys= w[0]*tanh((xs - w[3])/(-2*w[2])) + w[4]*xs + w[1]+w(5)*xs^2+w[5]*0
+	ys= w[0]*tanh((xs - w[3])/(-2*w[2])) + w[4]*xs + w[1]+xs^2*w[5]
 End
 
 Function CT2(w,x) : FitFunc
@@ -459,6 +471,10 @@ Function CT2(w,x) : FitFunc
 
 	return w[0]*tanh(-(x - w[3])/(2*w[2])) + w[4]*x + w[1]+w[5]*x^2
 End
+
+Function calc_occ(variable x,variable xo, variable theta) 
+	return 0.5*tanh((x - xo)/(2*theta))
+end
 
 
 
@@ -516,24 +532,24 @@ end
 
 
 function center_demod(int filenum, int delay, int wavelen)
-string wname="dat"+num2str(filenum)+"cscurrent_2d";
-sqw_analysis($wname,delay,wavelen)
+string wname="dat"+num2str(filenum)+"cscurrent_2d_nf_entr";
+sqw_analysis($wname,delay,wavelen)//--> nument
 wave W_coef, cold, hot  
 W_coef[0]= {0.0531997,0.880123,10.688,-12.024,7.28489e-05,7.50215e-08}
- W_coef[0]= {-0.0277372,0.860164,21.0104,-106.633,8.64866e-05}
+W_coef={-0.0039044,0.2688,244.77,-191.16,-9.6209e-07,0}
 
-ctrans_avg(cold,1,0, "ct", average=0)
-wave ct0fit_params
-duplicate/o/r=[][3] ct0fit_params mids
+//ctrans_avg(cold,1,0, "cst", average=0,minx=-1000,maxx=1000)
+wave mids
+//duplicate/o/r=[][3] ct0fit_params mids
 string wname1="dat"+num2str(filenum)+"cscurrentx_2d";
 
 wave demod
-demodulate(filenum, 2, "cscurrent_2d")
+demodulate(filenum, 2, "cscurrent_2d_nf")
 
 wave nument
-centering($wname1,"entropy",mids) // centred plot and average plot
+centering(demod,"entropy",mids) // centred plot and average plot
 centering(nument,"numentropy",mids) // centred plot and average plot
-find_thetas_larger(30) // makes wave called reduced
+find_thetas_larger(350) // makes wave called reduced
 wave entropy, entropy_avg, numentropy, numentropy_avg, reduced
 cleaning(entropy, reduced); 
 cleaning(nument, reduced); 
@@ -541,18 +557,18 @@ cleaning(nument, reduced);
 avg_wav(entropy); 
 avg_wav(numentropy)
 entropy_avg=entropy_avg*2;
-wavetransform/o zapnans entropy_avg
-wavetransform/o zapnans numentropy_avg
+//wavetransform/o zapnans entropy_avg
+//wavetransform/o zapnans numentropy_avg
 
-Integrate entropy_avg/D=entropy_avg_INT;
-Integrate numentropy_avg/D=numentropy_avg_INT;
+//Integrate entropy_avg/D=entropy_avg_INT;
+//Integrate numentropy_avg/D=numentropy_avg_INT;
 
 variable factor
 factor=calc_scaling( cold, hot,  mids)
-entropy_avg_int=entropy_avg_INT*factor;
-numentropy_avg_int=numentropy_avg_INT*factor;
+//entropy_avg_int=entropy_avg_INT*factor;
+//numentropy_avg_int=numentropy_avg_INT*factor;
 
-execute("intent_graph()")
+//execute("intent_graph()")
 
 end
 
@@ -611,25 +627,29 @@ EndMacro
 function calc_scaling(wave cold,wave hot, wave mids)
 
 //first we need to center cold and hot wave
-
 centering(cold,"cold_centr",mids) // centred plot and average plot
 centering(hot,"hot_centr",mids) // centred plot and average plot
-wave reduced
-cleaning(cold, reduced); 
-cleaning(hot, reduced); 
+wave badgammasx
+cleaning(cold, badgammasx); 
+cleaning(hot, badgammasx); 
 
 
 wave cold_centr,hot_centr, cold_centr_avg, hot_centr_avg, W_coef
 avg_wav(cold_centr);
 avg_wav(hot_centr);
  execute("hot_cold()")
-DeletePoints 5,1, W_coef
-    W_coef[0]= {-0.0546777,0.882581,11.9077,-16.7818,7.74687e-05}
+//DeletePoints 5,1, W_coef
+W_coef={-0.00311856,0.216734,186.321,399.402,-7.41618e-07,0}
+wave/t T_Constraints
+T_Constraints[0]= {"K0 > -0.1","K0 < 0","K1 > 0","K1 < 0.5","K2 > 0","K3 > -500","K3 < 500"}
+
+
     
-    FuncFit/TBOX=768 Chargetransition W_coef cold_centr_avg /D 
+//    FuncFit/TBOX=768 Chargetransition W_coef cold_centr_avg /D 
+    FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef cold_centr_avg /D /C=T_Constraints 
     duplicate/o W_coef, cold_r
     
-    FuncFit/TBOX=768 Chargetransition W_coef hot_centr_avg /D 
+    FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef hot_centr_avg /D /C=T_Constraints 
     duplicate/o W_coef, hot_r
     
  variable   Go= (cold_r[0]+hot_r[0]); print Go

@@ -30,12 +30,12 @@ function dotcond_avg(wave wav, int refit,string kenner_out)
 	string neg_avg=split_neg+"_avg"
 	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
 	variable N
-	N=4// how many sdevs in thetas are acceptable?
+	N=10// how many sdevs in thetas are acceptable?
 
 
 
 	if (refit==1)
-		cond_fit_params($datasetname,kenner_out)// finds fit_params
+		condc_fit_params($datasetname,kenner_out)// finds fit_params
 		find_plot_gammas(fit_params_name,N) //need to do this to refind good and bad gammas
 		duplicate/o/r=[][2] $fit_params_name mids
 		centering($datasetname,cond_centr,mids)// only need to center after redoing fits, centred plot; returns cond_centr
@@ -43,7 +43,7 @@ function dotcond_avg(wave wav, int refit,string kenner_out)
 	endif
 
 
-	split_wave( $cleaned,  0) //makes condxxxxcentered 
+	split_wave( $cleaned, datasetname  ) //makes condxxxxcentered 
 	avg_wav($split_pos) // pos average
 	avg_wav($split_neg) // neg average
 	calc_avg_cond($pos_avg,$neg_avg,avg) // condxxxxavg
@@ -54,11 +54,20 @@ function dotcond_avg(wave wav, int refit,string kenner_out)
 end
 
 
-function/wave split_wave(wave wav, variable flag)
-	wave kenner
-	redimension/n=-1 kenner
+function/wave split_wave(wave wav, string datasetname)
+wave data=$datasetname
+wave kenner
 	Duplicate/o kenner,idx
-	idx = kenner[p] > flag ? p : NaN
+
+
+    MatrixOp/O  minis=mincols(data); matrixtranspose minis
+    MatrixOp/O  maxis=maxcols(data); matrixtranspose maxis
+    Duplicate/o maxis kenner
+    kenner=maxis+minis
+    	redimension/n=-1 kenner
+
+
+	idx = kenner[p] > 0 ? p : NaN
 	WaveTransform zapnans idx
 
 	string wn=nameofwave(wav)
@@ -77,10 +86,9 @@ function/wave split_wave(wave wav, variable flag)
 
 	while(i<dimsize(idx,0))
 
-
-	//now look for negative values
+//	//now look for negative values
 	Duplicate/o kenner,idx
-	idx = kenner[p][q] < flag ? p : NaN
+	idx = kenner[p] < 0 ? p : NaN
 	WaveTransform zapnans idx
 
 	string newname1 =wn+"_neg"
@@ -164,12 +172,12 @@ function find_plot_gammas(string fit_params_name, variable N)
 		if (abs(gammas[i] - gammamean) < (N * gammastd))
 
 			insertPoints /v = (gammas[i]) nr, 1, goodgammas // value of gamma
-			insertpoints /v = (i) nr, 1, goodgammasx        // the repeat
+			insertpoints /v = (i) nr, 1, goodgammasx        // the index of the row that has a good gamma
 
 		else
 
 			insertPoints /v = (gammas[i]) nr, 1, badgammas // value of gamma
-			insertpoints /v = (i) nr, 1, badgammasx        // repeat
+			insertpoints /v = (i) nr, 1, badgammasx        // the index of the row that has a bad gamma
 
 		endif
 
@@ -210,7 +218,6 @@ function plot_badgammas(wave wav)
 	int i
 	int nr
 	wave badgammasx
-	string w2d
 	string dataset=nameOfWave(wav)
 
 
@@ -312,10 +319,11 @@ function /wave fit_peak(wave current_array)
 	temp[0,10]=0;
 	temp[inf-10,inf]=0;
 	make/o/n=4 W_coef
+	W_coef[0]= {0,35764.5,0,4.99354e+06}
 	wavestats/q temp
-	CurveFit/q lor current_array[round(V_maxrowloc-V_npnts/20),round(V_maxrowloc+V_npnts/20)] /D
-	
-	
+	CurveFit/q/h="1000" lor kwCWave=W_coef, current_array[round(V_maxrowloc-V_npnts/10),round(V_maxrowloc+V_npnts/10)] /D
+//	CurveFit/q lor current_array /D
+
 end
 
 
@@ -475,7 +483,7 @@ function /wave cond_fit_params(wave wav, string kenner_out)
 
 
 	for (i=0; i < nc ; i+=1) //nc
-		temp_wave = wav[p][i]	;	redimension/n=-1 temp_wave
+		temp_wave = wav[p][i]	;	//redimension/n=-1 temp_wave
 
 		fit_peak(temp_wave)
 		fit_params[i][0,3] = W_coef[q]
@@ -484,12 +492,57 @@ function /wave cond_fit_params(wave wav, string kenner_out)
 		fit_params[i][6] = W_sigma[2]
 		fit_params[i][7] = W_sigma[3]
 
+	endfor
+
+	return fit_params
+
+end
+
+function /wave condc_fit_params(wave wav, string kenner_out)
+	string w2d=nameofwave(wav)
+	int wavenum=getfirstnum(w2d)
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params" //new array
+
+
+	variable i
+	string wavg
+	int nc
+	int nr
+	wave fit_params
+	wave W_coef
+	wave W_sigma
+
+	nr = dimsize(wav,0) //number of rows (total sweeps)
+	nc = dimsize(wav,1) //number of columns (data points)
+	make/o /N=(nr) temp_wave
+	CopyScales wav, temp_wave
+	//setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", temp_wave
+
+	make/o /N= (nc , 8) /o $fit_params_name
+	wave fit_params = $fit_params_name
+
+
+	for (i=0; i < nc ; i+=2) //nc
+		temp_wave = wav[p][i]-wav[p][i+1]	;	//redimension/n=-1 temp_wave
+
+		fit_peak(temp_wave)
+		fit_params[i][0,3] = W_coef[q]
+		fit_params[i][4] = W_sigma[0]
+		fit_params[i][5] = W_sigma[1]
+		fit_params[i][6] = W_sigma[2]
+		fit_params[i][7] = W_sigma[3]
+		fit_params[i+1][0,3] = W_coef[q]
+		fit_params[i+1][4] = W_sigma[0]
+		fit_params[i+1][5] = W_sigma[1]
+		fit_params[i+1][6] = W_sigma[2]
+		fit_params[i+1][7] = W_sigma[3]
 
 	endfor
 
 	return fit_params
 
 end
+
 
 function dotfigs(variable wavenum,variable N,string kenner, string kenner_out)	
 	string dataset="dat"+num2str(wavenum)+kenner

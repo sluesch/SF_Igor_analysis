@@ -64,11 +64,8 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 	wave wav=$wn
 	struct AWGVars AWGLI
 	fd_getoldAWG(AWGLI, datnum)
-
-	print AWGLI
-
-	cols=dimsize(wav,0); print cols
-	rows=dimsize(wav,1); print rows
+	cols=dimsize(wav,0); //print cols
+	rows=dimsize(wav,1); //print rows
 	nofcycles=AWGLI.numCycles;
 	period=AWGLI.waveLen;
 	print "AWG num cycles  = " + num2str(nofcycles)
@@ -336,6 +333,7 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 	temp_ifft += offset
 Redimension/N=(num_rows,-1) temp_ifft
 	copyscales wav, temp_ifft
+	
 	duplicate /o temp_ifft $notch_name
 
 	
@@ -1062,7 +1060,9 @@ function centering(wave waved,string centered, wave mids)
 	wave new2dwave=$centered
 	copyscales waved new2dwave
 	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+//	mids=mids*0
 	new2dwave=interp2d(waved,(x+mids[q]),(y)) // mids is the shift in x
+
 end
 
 //function cst_centering(wave waved,string kenner_out)
@@ -1078,3 +1078,43 @@ end
 //	copyscales waved new2dwave
 //	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
 //end
+
+function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
+	// Takes time series data and returns power spectrum
+	wave time_series  // Time series (in correct units -- i.e. check that it's in nA first)
+	variable scan_duration // If passing a wave which does not have Time as x-axis, this will be used to rescale
+	variable linear // Whether to return with linear scale (or log scale)
+	
+	linear = paramisDefault(linear) ? 1 : linear
+
+	duplicate/free time_series tseries
+	if (scan_duration)
+		setscale/i x, 0, scan_duration, tseries
+	else
+		scan_duration = DimDelta(time_series, 0) * DimSize(time_series, 0)
+	endif
+
+	variable last_val = dimSize(time_series,0)-1
+	if (mod(dimsize(time_series, 0), 2) != 0)  // ODD number of points, must be EVEN to do powerspec
+		last_val = last_val - 1
+	endif
+		
+	
+	// Built in powerspectrum function
+
+	if (!linear)  // Use log scale
+		DSPPeriodogram/PARS/DBR=1/NODC=2/R=[0,(last_val)] tseries  
+		wave w_Periodogram
+		duplicate/free w_Periodogram, powerspec
+		powerspec = powerspec+10*log(scan_duration)  // This is so that the powerspec is independent of scan_duration
+	else  // Use linear scale
+		DSPPeriodogram/PARS/NODC=2/R=[0, (last_val)] tseries
+		wave w_Periodogram
+		duplicate/o w_Periodogram, powerspec
+		// TODO: I'm not sure this is correct, but I don't know what should be done to fix it -- TIM
+		powerspec = powerspec*scan_duration  // This is supposed to be so that the powerspec is independent of scan_duration
+	endif
+//	powerspec[0] = NaN
+	return powerspec
+	
+end
