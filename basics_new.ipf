@@ -7,6 +7,8 @@
 #include <WMBatchCurveFitIM>
 #include <Decimation>
 #include <Wave Arithmetic Panel>
+#include <Reduce Matrix Size>
+
 
 
 
@@ -240,24 +242,36 @@ function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 
 end  
 
+function rescalex(wave wav, variable factor)
+variable low=indextoScale(wav,0,0)*factor;
+variable high=indextoScale(wav,inf,0)*factor;
+SetScale/I x low,high,"", wav
+end
+
+function rescaley(wave wav, variable factor)
+variable low=indextoScale(wav,0,1)*factor;
+variable high=indextoScale(wav,inf,1)*factor;
+SetScale/I y low,high,"", wav
+end
 
 
-function/wave resampleWave(wave wav,variable targetFreq )
+
+function/wave resampleWave(wave wav,variable targetFreq,variable measureFreq )
 	// resamples wave w from measureFreq
 	// to targetFreq (which should be lower than measureFreq)
 	string wn=nameOfWave(wav)
 	int wavenum=getfirstnum(wn)
 
-	variable measureFreq
+//	variable measureFreq
 //		struct ScanVars S
 //		fd_getScanVars(S,wavenum)
 //	struct AWGVars S
 //	fd_getoldAWG(S,wavenum)
 
-	measureFreq=fd_getmeasfreq(wavenum)
+//	measureFreq=fd_getmeasfreq(wavenum); print measurefreq
 	variable N=measureFreq/targetFreq
-	wave temp_wave
-	duplicate/o wav, temp_wave
+//	wave temp_wave
+//	duplicate/o wav, temp_wave
 
 
 	RatioFromNumber (targetFreq / measureFreq)
@@ -265,7 +279,7 @@ function/wave resampleWave(wave wav,variable targetFreq )
 		string cmd
 		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
 	endif
-	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 temp_wave
+	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 wav
 
 
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
@@ -410,16 +424,6 @@ Redimension/N=(num_rows,-1) temp_ifft
 //	endif
 end
 
-Window Noise_check() : Graph
-	PauseUpdate; Silent 1		// building window...
-	Display /W=(35,53,1478,1119) slice1,slice2,slice3,slice4,slice5,slice6
-	ModifyGraph rgb(slice1)=(13107,13107,13107),rgb(slice2)=(65535,62414,0),rgb(slice3)=(13107,13107,13107)
-	ModifyGraph rgb(slice4)=(0,65535,47661),rgb(slice5)=(13107,13107,13107),rgb(slice6)=(32767,0,65535)
-	ModifyGraph offset(slice3)={400,0},offset(slice4)={400,0},offset(slice5)={-400,0}
-	ModifyGraph offset(slice6)={-400,0}
-	Legend/C/N=text0/J "\\s(slice1) slice1\r\\s(slice2) slice2\r\\s(slice3) slice3\r\\s(slice4) slice4\r\\s(slice5) slice5\r\\s(slice6) slice6"
-EndMacro
-
 
 function /s avg_wav(wave wav) // /WAVE lets your return a wave
 
@@ -560,6 +564,49 @@ function udh5([file_name,range,noraw])
    
    	variable	ms=stopmstimer(refnum)
 	print ms/1e6
+end
+
+
+function /s  loadh5(int filenum,int raw, [string kenner2])
+	// Loads HDF files back into Igor
+	
+//	variable refnum=startmstimer
+
+	string infile = wavelist("*",";","") // get wave list
+	string kenner
+	kenner = selectstring(raw,"","_RAW")
+//	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files in data path
+	
+	string currentHDF="dat"+num2str(filenum)+kenner+".h5", currentWav="", datasets="", currentDS, loadedwaves=""
+	
+	variable fileid=0, numWN = 0, wnExists=0
+	variable i=0, j=0, numloaded=0
+	int loadthiswave
+
+	HDF5OpenFile/P=data /R fileID as currentHDF
+	HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
+	datasets = S_HDF5ListGroup
+	numWN = itemsinlist(datasets)
+	currentHDF = currentHDF[0,(strlen(currentHDF)-4)] // separate dat#### from .h5 
+	for(j=0; j<numWN; j+=1) // loop over datasets within h5 file
+			currentDS = StringFromList(j,datasets)
+			currentWav = currentHDF+currentDS
+		   wnExists = FindListItem(currentWav, infile,  ";")
+		   loadthiswave = (wnExists==-1) && (paramisdefault(kenner2) || (stringmatch(currentDS,kenner2)))
+		   // print currentDS,loadthiswave
+		   if (loadthiswave)
+		   	// load wave from hdf
+		   	HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
+		   	loadedwaves = addlistitem(currentwav,loadedwaves)
+		   	numloaded+=1
+		   endif
+	endfor
+	HDF5CloseFile fileID
+	
+
+//    variable	ms=stopmstimer(refnum)
+//	print ms/1e6
+	return loadedwaves
 end
 
 
@@ -743,25 +790,13 @@ cond=1/temp *aspectrat // cond * geometry of sample =conductivity
 end	
 
 macro setparams_wide()
-ModifyGraph fSize=24
+ModifyGraph fSize=14
 ModifyGraph gFont="Gill Sans Light"
-ModifyGraph width={Aspect,1},height=400
 ModifyGraph grid=0
-ModifyGraph width=500,height=380
-ModifyGraph width=0,height=0
+ModifyGraph width=500,height=300
 endmacro
 
-macro setparams_square()
 
-Label bottom ""
-Label left ""
-	ModifyGraph fSize=24
-ModifyGraph gFont="Gill Sans Light"
-//ModifyGraph width=283.465,height={Aspect,1.62}
-ModifyGraph grid=2
-ModifyGraph width={Aspect,1},height=400
-
-endmacro
 
 
 
@@ -926,7 +961,6 @@ function int_PSD(tim)
 end
 
 macro testLI()
-
 setFdacAWGSquareWave(fd, 100, -100, 0.01, 0.01, 0)
 setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1);
 ScanFastDAC(fd, -1, 1, "3", sweeprate=0.5,  repeats=1,  use_awg=1,nosave=0)
@@ -1057,12 +1091,22 @@ end
 
 function centering(wave waved,string centered, wave mids)
 	duplicate/o waved $centered
+//	display; appendimage waved
 	wave new2dwave=$centered
 	copyscales waved new2dwave
 	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-//	mids=mids*0
 	new2dwave=interp2d(waved,(x+mids[q]),(y)) // mids is the shift in x
+//		display; appendimage $centered
 
+end
+
+function center_xscale(wave waved)
+duplicate/o waved tempx
+tempx=x; wavestats/q tempx
+	variable shift, delta
+	shift= dimoffset(waved,0)-V_avg
+	delta=dimdelta(waved,0)
+	SetScale/P x shift,delta,"", waved
 end
 
 //function cst_centering(wave waved,string kenner_out)
@@ -1118,3 +1162,26 @@ function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
 	return powerspec
 	
 end
+
+function create_y_wave(wave_2d)
+	// create global "y_wave" given a 2d array
+	wave wave_2d
+	
+	string wave_2d_name = nameofwave(wave_2d)
+	
+	duplicate /o /RMD=[0][] $wave_2d_name y_wave
+	y_wave = y
+	redimension /n=(dimsize(y_wave, 1)) y_wave
+end
+
+
+function create_x_wave(wave_2d)
+	// create global "x_wave" given a 2d array
+	wave wave_2d
+	
+	string wave_2d_name = nameofwave(wave_2d)
+	
+	duplicate /o /RMD=[][0] $wave_2d_name x_wave
+	x_wave = x
+end
+

@@ -275,7 +275,7 @@ end
 function fd_getmeasfreq(datnum,[fastdac_num])
 	// Function to get old h5 values for measurement frequency
 	variable datnum, fastdac_num
-	variable sl_id, fd_id  //JSON ids
+	variable sl_id, id  //JSON ids
 	variable freq
 	fastdac_num = paramisdefault(fastdac_num) ? 1 : fastdac_num
 
@@ -284,14 +284,16 @@ function fd_getmeasfreq(datnum,[fastdac_num])
 	endif
 
 	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
-	fd_id = getJSONXid(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
+	//fd_id = getJSONXid(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
+//id = getJSONXid(sl_id, "MeasureFreq ") // Get FastDAC JSON from Sweeplogs
+
 
 	// Get variable parts
 
 	//	JSONXOP_GetValue/V fd_id, "/AWG/initialized"
 	//	S.initialized=V_value
 
-	JSONXOP_GetValue/V fd_id, "MeasureFreq"
+	JSONXOP_GetValue/V sl_id, "measureFreq"
 	freq=V_value
 
 	JSONXOP_Release /A  //Clear all stored JSON strings

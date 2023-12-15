@@ -46,14 +46,6 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 
 
 	variable N=10; // how many sdevs are acceptable?
-//	if (dimsize(wav,0)>1e4)
-////notch_filters(wav, Hzs="60;180;300",  Qs="20;150;250"); 
-//
-//string nfname=datasetname+"_nf"; 
-//wave temp_wave
-////resampleWave($nfname,300 );
-//duplicate/o temp_wave $datasetname
-//endif
 
 closeallGraphs(); display
 
@@ -66,10 +58,11 @@ closeallGraphs(); display
 
 
 	string quickavg=avg_wav($datasetname) // averages datasetname and returns the name of the averaged wave
+	print quickavg
 
 	if (refit==1)
 		if (average==1) // sometimes we do not want to average
-			get_initial_params($quickavg);// print W_coef
+			//get_initial_params($quickavg);// print W_coef
 			fit_transition($quickavg,minx,maxx);// print W_coef
 		endif
 
@@ -83,7 +76,10 @@ closeallGraphs(); display
 		if (average==1) // sometimes we do not want to average
 			duplicate/o/r=[][3] $fit_params_name mids
 			centering($datasetname,centered,mids) // centred plot and average plot
+//			display; appendimage $centered
 			cleaning($centered,badthetasx)
+//			display; appendimage $cleaned
+
 		endif
 
 	elseif(dotcondcentering==1)
@@ -101,7 +97,7 @@ closeallGraphs(); display
 
 	if (average==1) // sometimes we do not want to average
 		avg_wav($cleaned) // quick average plot
-		get_initial_params($quickavg); //print W_coef
+		//get_initial_params($quickavg); //print W_coef
 		fit_transition($avg,minx,maxx)
 		prepfigs(wavenum,N,kenner,kenner_out,minx,maxx)
 	endif
@@ -122,12 +118,13 @@ function /wave get_initial_params(sweep)
 	// for a given sweep returns a guess of initial parameters for the fit function: Charge transiton
 
 	wave sweep
+	wavestats/q sweep
 	duplicate /o sweep x_array
 	x_array = x
 
 	variable amp = wavemax(sweep) - wavemin(sweep) //might be worthwile looking for a maximum/minimum with differentiation
 	//variable amp = 0.001
-	variable const = mean(sweep)
+	variable const = V_avg
 	variable theta = 50
 
 	duplicate /o sweep sweepsmooth
@@ -141,10 +138,10 @@ function /wave get_initial_params(sweep)
 	//variable amp = sweep[extractedwave[0]] - sweep[extractedwave[1]] // new
 
 
-	variable lin = 0.001  // differentiated value of flat area?
+	variable lin = 0.00  // differentiated value of flat area?
 
 	Make /D/N=6/O W_coef
-	W_coef[0] = {amp,const,theta,mid,lin,0,0}; print W_coef
+	W_coef[0] = {amp,const,theta,mid,lin,0}; print W_coef
 
 	killwaves extractedwave, sweepsmooth
 	return W_coef
@@ -160,20 +157,33 @@ function /wave fit_transition(current_array,minx,maxx)
 
 	wave current_array
 	variable minx,maxx
+	int nr=dimsize(current_array,0)
+	
+	if(stringmatch(nameofWave(current_array),"slice"))
+	if (nr>1e5)
+	resampleWave(current_array,500,12195.12195);
+	print "meas Freq has to be set by hand here"
+	endif
+	endif
+
 
 
 	wave W_coef
 	wave/t T_Constraints 
 
-	 // W_coef[0]= {-0.03095,1.29277,7.82084,-334.495,4.46489e-05,0}
-	   W_coef[0]= {-0.00422886,0.216177,225.6,32.8403,-2.42636e-07,0}
-	   T_Constraints[0]= {"K0 > -0.1","K0 < 0","K1 > 0","K1 < 0.5","K2 > 0","K3 > -500","K3 < 500"}
+//  W_coef[0]= {-7.05932,225.377,749.573,-89.1755,0.000178245,-9.98657e-09}
+  //W_coef[0]= {-0.161731,7.22807,105.965,-17.3199,0.000973737,0}
+//	   T_Constraints[0]= {"K0 > -0.1","K0 < 0","K1 > 0","K1 < 0.5","K2 > 0","K3 > -500","K3 < 500"}
+//	   	FuncFit/q/x=1/H="000000"/TBOX=768 Chargetransition W_coef current_array(minx,maxx) /D /C=T_Constraints 
+
 
 
 
 	removefromgraph /all; appendtoGraph current_array
 	//FuncFit/q /TBOX=768 CT_faster W_coef current_array(minx,maxx) /D
-	FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef current_array(minx,maxx) /D /C=T_Constraints 
+	FuncFit/q/x=1/H="000000"/TBOX=768 Chargetransition W_coef current_array(minx,maxx) /D //C=T_Constraints 
+	//FuncFit/X=1/H="0000010"/TBOX=768 Gamma_fit W_coef current_array(minx,maxx) /D /C=T_Constraints 
+
 	makecolorful(); 
 	doupdate
 	//sleep/s 1
@@ -208,8 +218,6 @@ function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx,
 	make /N= (nc , 12) /o $fit_params_name
 	wave fit_params = $fit_params_name
 //reduce_and_chop(wavenm, 5000)
-print dimsize(wavenm,0); print dimsize(temp_wave,0) 
-//resampleWave(wavenm,300 );
 print dimsize(wavenm,0); print dimsize(temp_wave,0) 
 	for (i=0; i < nc ; i+=1)
 
@@ -472,8 +480,11 @@ Function CT2(w,x) : FitFunc
 	return w[0]*tanh(-(x - w[3])/(2*w[2])) + w[4]*x + w[1]+w[5]*x^2
 End
 
-Function calc_occ(variable x,variable xo, variable theta) 
-	return 0.5*tanh((x - xo)/(2*theta))
+Function calc_occ(variable x,wave w ) 
+//	return 0.5*tanh((x - xo)/(2*theta))
+	return Gamma_transition( x,  1, 0, w[2],  w[3], 0,  0,w[6])
+
+
 end
 
 
@@ -489,9 +500,17 @@ function dotcond_centering(wave waved, string kenner_out)
 	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
 End
 
-function/wave sqw_analysis(wave wav, int delay, int wavelen)
+function/wave sqw_analysis(wave wav, int delay)
 
 // this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
+string name
+variable filenum=getfirstnum(nameOfWave(wav));
+//string heatwave="dat"+num2str(filenum)+"_RAWfdAW_1";
+string heatwave="dat"+num2str(filenum)+"fdAW_1";
+
+wave heatwav=$heatwave;
+int wavelen=heatwav[0][1];
+
 	variable nr, nc
 	nr=dimsize(wav,0); print nr
 	nc=dimsize(wav,1); print nc
@@ -530,10 +549,43 @@ function/wave sqw_analysis(wave wav, int delay, int wavelen)
 
 end
 
+function/wave sqw_analysis1d(wave wav, int delay, int wavelen)
+duplicate/o wav temp
+// this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
+	variable nr, nc
+	nr=dimsize(wav,0); print nr
+	variable N
+	N=nr/wavelen/4;
+wave slice_new
+	Make/o/N=(N) cold1, cold2, hot1, hot2
+
+	
+		Redimension/N=(wavelen,4,N) temp
+		DeletePoints/M=0 0,delay, temp
+		reducematrixSize(temp,0,-1,1,0,-1,4,1,"slice_new")
+
+		cold1[]=slice_new[0][0][p]
+		cold2[]=slice_new[0][2][p]
+		hot1[]=slice_new[0][1][p]
+		hot2[]=slice_new[0][3][p]
+
+
+	duplicate/o cold1, cold; cold=(cold1+cold2)/2
+	duplicate/o hot1, hot; hot=(hot1+hot2)/2
+
+	matrixtranspose hot
+	matrixtranspose cold
+
+	CopyScales wav, cold, hot
+	
+	duplicate/o hot, nument
+	nument=cold-hot;
+
+end
 
 function center_demod(int filenum, int delay, int wavelen)
-string wname="dat"+num2str(filenum)+"cscurrent_2d_nf_entr";
-sqw_analysis($wname,delay,wavelen)//--> nument
+string wname="dat"+num2str(filenum)+"cscurrent_2d_nf";
+sqw_analysis($wname,delay)//--> nument
 wave W_coef, cold, hot  
 W_coef[0]= {0.0531997,0.880123,10.688,-12.024,7.28489e-05,7.50215e-08}
 W_coef={-0.0039044,0.2688,244.77,-191.16,-9.6209e-07,0}
@@ -637,24 +689,73 @@ cleaning(hot, badgammasx);
 wave cold_centr,hot_centr, cold_centr_avg, hot_centr_avg, W_coef
 avg_wav(cold_centr);
 avg_wav(hot_centr);
- execute("hot_cold()")
+ //execute("hot_cold()")
 //DeletePoints 5,1, W_coef
-W_coef={-0.00311856,0.216734,186.321,399.402,-7.41618e-07,0}
-wave/t T_Constraints
-T_Constraints[0]= {"K0 > -0.1","K0 < 0","K1 > 0","K1 < 0.5","K2 > 0","K3 > -500","K3 < 500"}
+W_coef={-0.2,7.2,120,0,0.001,0}
+  W_coef[0]= {-59.9403,1201.01,16.3092,102.603,0.000838782,-4.62726e-07}
+
+//wave/t T_Constraints
+//T_Constraints[0]= {"K0 > -0.1","K0 < 0","K1 > 0","K1 < 0.5","K2 > 0","K3 > -500","K3 < 500"}
 
 
     
 //    FuncFit/TBOX=768 Chargetransition W_coef cold_centr_avg /D 
-    FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef cold_centr_avg /D /C=T_Constraints 
+    FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef cold_centr_avg /D// /C=T_Constraints 
     duplicate/o W_coef, cold_r
     
-    FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef hot_centr_avg /D /C=T_Constraints 
+    FuncFit/q/H="000000"/TBOX=768 Chargetransition W_coef hot_centr_avg /D// /C=T_Constraints 
     duplicate/o W_coef, hot_r
     
  variable   Go= (cold_r[0]+hot_r[0]); print Go
  variable   dT=((hot_r[2]-cold_r[2])); print dT
  variable factor=-1/Go/dT; print factor
  return factor
+  execute("hot_cold()")
+
 end
 
+function compare2occ()
+//duplicate/o entr1134_RAWns occ1134_RAWns
+//duplicate/o entr1134_RAWns occ1134_RAWxns
+//occ1134_RAWxns=x;
+//occ1134_RAWns=calc_occ( occ1134_RAWxns,start1134) 
+//Duplicate/O entr1134_RAWns,entr1134_RAWns_smth;DelayUpdate
+//Smooth 10, entr1134_RAWns_smth;DelayUpdate
+//display entr1134_RAWns vs occ1134_RAWns
+//append entr1134_RAWns_smth vs occ1134_RAWns
+end
+
+function Gamma_transition(variable x, variable Amp,variable Const,variable Theta, variable Mid,variable Linear, variable padder,variable Gam)
+// Gamma_transition( x,  Amp, Const, Theta,  Mid, Linear,  padder,Gam)
+
+variable y
+Variable/C ci = sqrt(-1)
+
+y=(-Amp)*(imag(digamma(0.5+(x-Mid+ci*Gam)/2/pi/ci/Theta))/pi)+Const+Linear*x+padder*x^2
+return y
+end
+
+
+
+Function Gamma_fit(w,x) : FitFunc
+	Wave w
+	Variable x
+
+	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+	//CurveFitDialog/ Equation:
+	//CurveFitDialog/ f(x) = Gamma_transition( x,  Amp, Const, Theta,  Mid, Linear,  padder,Gam)
+	//CurveFitDialog/ End of Equation
+	//CurveFitDialog/ Independent Variables 1
+	//CurveFitDialog/ x
+	//CurveFitDialog/ Coefficients 7
+	//CurveFitDialog/ w[0] = Amp
+	//CurveFitDialog/ w[1] = Const
+	//CurveFitDialog/ w[2] = Theta
+	//CurveFitDialog/ w[3] = Mid
+	//CurveFitDialog/ w[4] = Linear
+	//CurveFitDialog/ w[5] = padder
+	//CurveFitDialog/ w[6] = Gam
+
+	return Gamma_transition( x,  w[0], w[1], w[2],  w[3], w[4],  w[5],w[6])
+End

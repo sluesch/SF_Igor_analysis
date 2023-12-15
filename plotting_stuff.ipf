@@ -5,6 +5,11 @@
 Menu "Graph"
 	"Close All Graphs/9", CloseAllGraphs()
 End
+
+Menu "Windows"
+	"Close All Tables/8", CloseAllTables()
+End
+
 Function CloseAllGraphs()
 	String name
 	do
@@ -16,7 +21,32 @@ Function CloseAllGraphs()
 	while(1)
 End
 
+Function CloseAllTables()
+	String name
+	do
+		name = WinName(0,2) // name of the front table
+		if (strlen(name) == 0)
+			break // all done
+		endif
+		DoWindow/K $name // Close the table
+	while(1)
+End
 
+function linebyline(wave wav, variable delta)
+//plots line by line (with spacing delta) of a 2d wave
+	string wavenm=nameofwave(wav)
+
+	variable i=0
+	variable endnum=dimsize(wav,1)
+	string st
+	i=0
+	do
+		appendtograph wav[][i]
+
+		i+=delta
+	while (i<=endnum)
+
+end
 
 Function AddLegend(wav,param)
     wave wav        
@@ -261,7 +291,9 @@ function spectrum_analyzer(wave data, int cutoff, int newplot)
 
 // Subtract V_avg from slice and calculate the spectrum
 wavestats/q slice;slice=slice-V_avg
+
 calculate_spectrum(slice, linear=1)
+wave powerspec
 duplicate/o powerspec, sum_power
 string toplot=nameOfWave(data)+"slice"
 duplicate/o slice,$toplot
